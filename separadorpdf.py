@@ -6,28 +6,31 @@ import subprocess
 from PIL import Image
 from pdf2image import convert_from_path
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 
+# Caminhos dos binários
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\USUARIO\Desktop\Separador 2\Tesseract-OCR\tesseract.exe'
 poppler_path = 'C:\\Users\\USUARIO\\Desktop\\Separador 2\\poppler-24.08.0\\Library\\bin'
 
-# Configura para suprimir janelas de terminal do Poppler
+# Configuração para suprimir janelas do terminal
 startupinfo = subprocess.STARTUPINFO()
 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
+# OCR
 def extrair_nome_paciente(imagem):
     try:
         texto = pytesseract.image_to_string(imagem, lang='por')
         match = re.search(r"(?:Nome|Paciente)[\s:\-\"“”|]*([A-ZÀ-Ú][A-Za-zÀ-ÿ\s]{3,})", texto, re.IGNORECASE)
         if match:
             nome = match.group(1).strip()
-            if len(nome.split()) >= 2:  # Heurística mínima para evitar ruídos
+            if len(nome.split()) >= 2:
                 return nome
     except Exception:
         pass
     return "Paciente_Desconhecido"
 
+# Processamento do PDF
 def processar_pdf(pdf_path, saida_pasta_base):
     nome_pdf = Path(pdf_path).stem
     saida_path = os.path.join(saida_pasta_base, nome_pdf)
@@ -39,7 +42,6 @@ def processar_pdf(pdf_path, saida_pasta_base):
     nome_atual = None
 
     for i in range(len(doc)):
-        # Suprime janelas piscando durante a conversão de páginas
         imagem = convert_from_path(
             pdf_path,
             dpi=150,
@@ -79,6 +81,7 @@ def processar_pdf(pdf_path, saida_pasta_base):
 
     doc.close()
 
+# Interface gráfica
 def iniciar_interface():
     def selecionar_pasta_pdfs():
         pasta = filedialog.askdirectory(title="Selecione a pasta com PDFs")
@@ -105,15 +108,24 @@ def iniciar_interface():
             messagebox.showinfo("Aviso", "Nenhum PDF encontrado na pasta.")
             return
 
-        for pdf in pdfs:
-            processar_pdf(pdf, pasta_saida)
+        progress["maximum"] = len(pdfs)
+        progress["value"] = 0
+        root.update_idletasks()
 
+        btn_iniciar.config(state="disabled")
+
+        for i, pdf in enumerate(pdfs, 1):
+            processar_pdf(pdf, pasta_saida)
+            progress["value"] = i
+            root.update_idletasks()
+
+        btn_iniciar.config(state="normal")
         messagebox.showinfo("Concluído", "Todos os PDFs foram processados com sucesso.")
 
-    # GUI
+    # Janela principal
     root = tk.Tk()
     root.title("Separador de Prontuários")
-    root.geometry("500x200")
+    root.geometry("500x250")
 
     tk.Label(root, text="Pasta com PDFs:").pack(pady=(10, 0))
     entry_pdf_dir = tk.Entry(root, width=60)
@@ -125,9 +137,14 @@ def iniciar_interface():
     entry_saida.pack()
     tk.Button(root, text="Selecionar", command=selecionar_pasta_saida).pack(pady=(0, 10))
 
-    tk.Button(root, text="Iniciar", command=iniciar_processamento).pack(pady=(10, 0))
+    btn_iniciar = tk.Button(root, text="Iniciar", command=iniciar_processamento)
+    btn_iniciar.pack(pady=(10, 0))
+
+    # Barra de progresso
+    progress = ttk.Progressbar(root, orient="horizontal", length=400, mode="determinate")
+    progress.pack(pady=(10, 0))
+
     root.mainloop()
 
 if __name__ == "__main__":
     iniciar_interface()
-
