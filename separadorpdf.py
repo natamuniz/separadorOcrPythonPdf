@@ -2,35 +2,34 @@ import os
 import re
 import fitz
 import pytesseract
-import subprocess
 from PIL import Image
 from pdf2image import convert_from_path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 
-# Caminhos dos binários
+# Caminhos do Tesseract e Poppler
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\USUARIO\Desktop\Separador 2\Tesseract-OCR\tesseract.exe'
 poppler_path = 'C:\\Users\\USUARIO\\Desktop\\Separador 2\\poppler-24.08.0\\Library\\bin'
 
-# Configuração para suprimir janelas do terminal
-startupinfo = subprocess.STARTUPINFO()
-startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
-# OCR
 def extrair_nome_paciente(imagem):
     try:
         texto = pytesseract.image_to_string(imagem, lang='por')
+        # Remove quebras de linha e espaços duplicados
+        texto = texto.replace('\n', ' ').strip()
+
         match = re.search(r"(?:Nome|Paciente)[\s:\-\"“”|]*([A-ZÀ-Ú][A-Za-zÀ-ÿ\s]{3,})", texto, re.IGNORECASE)
         if match:
             nome = match.group(1).strip()
+            nome = re.sub(r'\s+', ' ', nome)  # remove espaços repetidos
+            nome = re.sub(r'[^A-Za-zÀ-ÿ\s]', '', nome)  # remove números e símbolos
             if len(nome.split()) >= 2:
                 return nome
     except Exception:
         pass
     return "Paciente_Desconhecido"
 
-# Processamento do PDF
+
 def processar_pdf(pdf_path, saida_pasta_base):
     nome_pdf = Path(pdf_path).stem
     saida_path = os.path.join(saida_pasta_base, nome_pdf)
@@ -47,13 +46,11 @@ def processar_pdf(pdf_path, saida_pasta_base):
             dpi=150,
             first_page=i + 1,
             last_page=i + 1,
-            poppler_path=poppler_path,
-            subprocess_startupinfo=startupinfo
+            poppler_path=poppler_path
         )[0]
 
         nome_encontrado = extrair_nome_paciente(imagem)
-        print(f"[{Path(pdf_path).name}] Página {i + 1}: Nome detectado = {nome_encontrado}")
-
+        print(f"[Página {i + 1}] Nome detectado: {nome_encontrado}")
 
         if nome_encontrado == "Paciente_Desconhecido" or nome_encontrado == nome_atual:
             grupo_atual.append(i)
@@ -68,7 +65,7 @@ def processar_pdf(pdf_path, saida_pasta_base):
 
     for nome, paginas in grupos:
         nome_final = nome or "Paciente_Desconhecido"
-        nome_limpo = re.sub(r'[\\/*?:"<>|]', "_", nome_final)[:100]
+        nome_limpo = re.sub(r'[\\/*?:"<>|\n\r]', "_", nome_final)[:100]
         contador = 1
         caminho_saida = os.path.join(saida_path, f"{nome_limpo}.pdf")
         while os.path.exists(caminho_saida):
@@ -83,7 +80,6 @@ def processar_pdf(pdf_path, saida_pasta_base):
 
     doc.close()
 
-# Interface gráfica
 def iniciar_interface():
     def selecionar_pasta_pdfs():
         pasta = filedialog.askdirectory(title="Selecione a pasta com PDFs")
@@ -124,7 +120,6 @@ def iniciar_interface():
         btn_iniciar.config(state="normal")
         messagebox.showinfo("Concluído", "Todos os PDFs foram processados com sucesso.")
 
-    # Janela principal
     root = tk.Tk()
     root.title("Separador de Prontuários")
     root.geometry("500x250")
@@ -139,10 +134,11 @@ def iniciar_interface():
     entry_saida.pack()
     tk.Button(root, text="Selecionar", command=selecionar_pasta_saida).pack(pady=(0, 10))
 
+    global btn_iniciar
     btn_iniciar = tk.Button(root, text="Iniciar", command=iniciar_processamento)
     btn_iniciar.pack(pady=(10, 0))
 
-    # Barra de progresso
+    global progress
     progress = ttk.Progressbar(root, orient="horizontal", length=400, mode="determinate")
     progress.pack(pady=(10, 0))
 
