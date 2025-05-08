@@ -52,6 +52,8 @@ def processar_pdf(pdf_path, saida_pasta_base):
         )[0]
 
         nome_encontrado = extrair_nome_paciente(imagem)
+        print(f"[{Path(pdf_path).name}] Página {i + 1}: Nome detectado = {nome_encontrado}")
+
 
         if nome_encontrado == "Paciente_Desconhecido" or nome_encontrado == nome_atual:
             grupo_atual.append(i)
