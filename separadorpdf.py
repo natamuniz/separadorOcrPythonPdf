@@ -2,6 +2,7 @@ import os
 import re
 import fitz
 import pytesseract
+import subprocess
 from PIL import Image
 from pdf2image import convert_from_path
 import tkinter as tk
@@ -10,6 +11,10 @@ from pathlib import Path
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\USUARIO\Desktop\Separador 2\Tesseract-OCR\tesseract.exe'
 poppler_path = 'C:\\Users\\USUARIO\\Desktop\\Separador 2\\poppler-24.08.0\\Library\\bin'
+
+# Configura para suprimir janelas de terminal do Poppler
+startupinfo = subprocess.STARTUPINFO()
+startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
 def extrair_nome_paciente(imagem):
     try:
@@ -34,7 +39,16 @@ def processar_pdf(pdf_path, saida_pasta_base):
     nome_atual = None
 
     for i in range(len(doc)):
-        imagem = convert_from_path(pdf_path, dpi=150, first_page=i+1, last_page=i+1, poppler_path=poppler_path)[0]
+        # Suprime janelas piscando durante a conversão de páginas
+        imagem = convert_from_path(
+            pdf_path,
+            dpi=150,
+            first_page=i + 1,
+            last_page=i + 1,
+            poppler_path=poppler_path,
+            subprocess_startupinfo=startupinfo
+        )[0]
+
         nome_encontrado = extrair_nome_paciente(imagem)
 
         if nome_encontrado == "Paciente_Desconhecido" or nome_encontrado == nome_atual:
